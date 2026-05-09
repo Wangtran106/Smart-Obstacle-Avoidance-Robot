@@ -1,6 +1,6 @@
 # Smart Obstacle Avoidance & Wall-Follower Robot
 
-
+![Robot Preview](robot_preview.png)
 
 This project features an Arduino-based autonomous robot designed for intelligent navigation. Equipped with three ultrasonic sensors, the robot can detect obstacles in real-time and execute a sophisticated wall-following algorithm to navigate through corridors and simple mazes.
 
