@@ -1,99 +1,102 @@
-# 🤖 Smart Obstacle Avoidance & Wall-Follower Robot
+# Smart Obstacle Avoidance & Wall-Follower Robot
 
-Dự án này là hệ thống điều khiển Robot tự hành thông minh dựa trên nền tảng **Arduino**. Robot được trang bị 3 cảm biến siêu âm để quét môi trường xung quanh, giúp nó có khả năng tự động tránh vật cản và thực hiện thuật toán bám tường (Wall Following) để di chuyển trong mê cung hoặc các hành lang hẹp.
+![Robot Preview](robot_preview.png)
 
----
-
-## 📋 Mục lục
-1. [Giới thiệu](#giới-thiệu)
-2. [Linh kiện phần cứng](#linh-kiện-phần-cứng)
-3. [Sơ đồ đấu nối (Pinout)](#sơ-đồ-đấu-nối-pinout)
-4. [Phân tích thuật toán điều khiển](#phân-tích-thuật-toán-điều-khiển)
-5. [Cấu trúc mã nguồn](#cấu-trúc-mã-nguồn)
-6. [Hướng dẫn cài đặt](#hướng-dẫn-cài-đặt)
+This project features an Arduino-based autonomous robot designed for intelligent navigation. Equipped with three ultrasonic sensors, the robot can detect obstacles in real-time and execute a sophisticated wall-following algorithm to navigate through corridors and simple mazes.
 
 ---
 
-## 🌟 Giới thiệu
-Robot sử dụng 3 cảm biến siêu âm HC-SR04 đặt ở 3 hướng: **Trái - Giữa - Phải**. Dữ liệu từ các cảm biến này được xử lý theo thời gian thực để điều khiển mạch cầu H L298N, từ đó điều chỉnh hướng và tốc độ của hai động cơ DC. Điểm đặc biệt của dự án là khả năng **ưu tiên bám tường trái**, cho phép robot tự tìm đường thoát trong các không gian có cấu trúc.
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Hardware Requirements](#hardware-requirements)
+3. [Pin Mapping](#pin-mapping)
+4. [Algorithm & Logic Analysis](#algorithm--logic-analysis)
+5. [Code Structure](#code-structure)
+6. [Installation & Setup](#installation--setup)
 
 ---
 
-## 🛠 Linh kiện phần cứng
-| Linh kiện | Số lượng | Chú thích |
+## Introduction
+The robot utilizes three HC-SR04 ultrasonic sensors positioned at the Left - Middle - Right to scan its surroundings. This data is processed in real-time to control an L298N H-Bridge motor driver, which adjusts the direction and speed of two DC motors. A key highlight of this project is its Left-Wall Following capability, allowing the robot to autonomously navigate complex paths by maintaining a fixed distance from the wall.
+
+---
+
+## Hardware Requirements
+| Component | Quantity | Notes |
 | :--- | :--- | :--- |
-| **Arduino Uno/Nano** | 1 | Bộ não điều khiển trung tâm |
-| **HC-SR04** | 3 | Cảm biến đo khoảng cách siêu âm |
-| **L298N Motor Driver** | 1 | Điều khiển hướng và tốc độ động cơ |
-| **Động cơ DC Gear** | 2 | Động cơ truyền động bánh xe |
-| **Pin Li-ion 18650** | 2-3 | Nguồn cấp cho robot (7.4V - 11.1V) |
-| **Khung xe Robot** | 1 | Loại 2 bánh hoặc 4 bánh |
+| **Arduino Uno/Nano** | 1 | Central controller |
+| **HC-SR04** | 3 | Ultrasonic distance sensors |
+| **L298N Motor Driver** | 1 | For DC motor control |
+| **DC Gear Motors** | 2 | Primary propulsion |
+| **Li-ion 18650 Battery** | 2-3 | Power supply (7.4V - 11.1V) |
+| **Robot Chassis** | 1 | 2-wheel or 4-wheel drive |
 
 ---
 
-## 📌 Sơ đồ đấu nối (Pinout)
+## Pin Mapping
 
-### 1. Cảm biến siêu âm (Ultrasonic Sensors)
-- **Cảm biến Trái (Left):** Trig -> `A1`, Echo -> `A0`
-- **Cảm biến Giữa (Middle):** Trig -> `A2`, Echo -> `A3`
-- **Cảm biến Phải (Right):** Trig -> `A4`, Echo -> `A5`
+### 1. Ultrasonic Sensors
+- **Left Sensor:** Trig -> `A1`, Echo -> `A0`
+- **Middle Sensor:** Trig -> `A2`, Echo -> `A3`
+- **Right Sensor:** Trig -> `A4`, Echo -> `A5`
 
-### 2. Mạch điều khiển động cơ (L298N)
-- **Motor A (Trái):** IN1 -> `5`, IN2 -> `3`, ENA -> `6` (PWM)
-- **Motor B (Phải):** IN3 -> `9`, IN4 -> `10`, ENB -> `11` (PWM)
-
----
-
-## 🧠 Phân tích thuật toán điều khiển
-
-Thuật toán của robot được chia thành 3 giai đoạn chính trong mỗi vòng lặp `loop()`:
-
-### 1. Thu thập dữ liệu (Data Acquisition)
-Robot gửi các xung trigger 5 micro-giây đến từng cảm biến và đo thời gian phản hồi (pulseIn). Khoảng cách (cm) được tính bằng công thức:
-`Distance = (Time * 0.034) / 2` (trong code là `pingTime / 29 / 2`).
-
-### 2. Phân cấp quyết định (Decision Hierarchy)
-Robot đưa ra quyết định dựa trên các điều kiện ưu tiên từ cao xuống thấp:
-
-*   **ƯU TIÊN 1 (Phản xạ khẩn cấp):** Nếu vật cản phía trước quá gần (`middleDistance <= 7cm`), robot sẽ ngay lập tức **Lùi lại** (`back`) để tránh va chạm.
-*   **ƯU TIÊN 2 (Phân tích hướng):**
-    *   Nếu bên trái có vật cản nhưng bên phải trống -> **Rẽ phải**.
-    *   Nếu bên phải có vật cản nhưng bên trái trống -> **Rẽ trái**.
-*   **ƯU TIÊN 3 (Duy trì hành trình):** Nếu cả 3 hướng đều thoáng, robot chuyển sang chế độ **Bám tường trái** (`bamtrai`).
-
-### 3. Thuật toán Bám tường trái (Left-Wall Following Algorithm)
-Đây là "trí thông minh" giúp robot đi dọc theo các bức tường mà không bị đâm vào hoặc đi quá xa.
-
-1. **Kiểm tra khoảng cách trái:** Robot liên tục so sánh `leftDistance` với giá trị đích là **5cm**.
-2. **Hiệu chỉnh (Micro-adjustments):**
-    - Nếu `leftDistance < 5cm`: Robot thực hiện lệnh `right(3)` (rẽ phải trong 3ms) để nhích ra xa tường.
-    - Nếu `leftDistance > 5cm`: Robot thực hiện lệnh `left(3)` (rẽ trái trong 3ms) để nhích lại gần tường.
-3. **Kết quả:** Quá trình này diễn ra liên tục hàng trăm lần mỗi giây, tạo ra chuyển động bám tường mượt mà.
+### 2. Motor Driver (L298N)
+- **Motor A (Left):** IN1 -> `5`, IN2 -> `3`, ENA -> `6` (PWM)
+- **Motor B (Right):** IN3 -> `9`, IN4 -> `10`, ENB -> `11` (PWM)
 
 ---
 
-## 📂 Cấu trúc mã nguồn
-- `void setup()`: Khởi tạo các chân Input/Output và Serial.
-- `void loop()`: Đọc cảm biến liên tục và kiểm tra điều kiện rẽ.
-- `void right(int a)`, `void left(int a)`...: Các hàm điều khiển chuyển động cơ bản với tham số `a` là thời gian trễ (delay).
-- `void bamtrai()`: Hàm xử lý logic bám tường.
+## Algorithm & Logic Analysis
+
+The robot's operation is divided into three main phases within the `loop()` function:
+
+### 1. Data Acquisition
+The robot sends 5-microsecond trigger pulses to each sensor and measures the response time (`pulseIn`). Distance (cm) is calculated using:
+`Distance = (Time * 0.034) / 2` (represented as `pingTime / 29 / 2` in code).
+
+### 2. Decision Hierarchy
+The robot follows a prioritized logic system to handle different scenarios:
+
+*   **PRIORITY 1 (Emergency Reflex):** If an obstacle is too close in front (`middleDistance <= 7cm`), the robot immediately reverses (`back`) to avoid a collision.
+*   **PRIORITY 2 (Directional Analysis):**
+    *   If the left path is blocked but the right is clear -> Turn Right.
+    *   If the right path is blocked but the left is clear -> Turn Left.
+*   **PRIORITY 3 (Standard Cruising):** If all paths are clear, the robot switches to Left-Wall Following mode (`bamtrai`).
+
+### 3. Left-Wall Following Algorithm
+This logic ensures the robot stays parallel to the wall without colliding or drifting away.
+
+1. **Distance Monitoring:** The robot continuously compares the `leftDistance` with a target value of 5cm.
+2. **Micro-adjustments:**
+    - If `leftDistance < 5cm`: Performs a `right(3)` (micro-turn right for 3ms) to move away from the wall.
+    - If `leftDistance > 5cm`: Performs a `left(3)` (micro-turn left for 3ms) to move closer to the wall.
+3. **Outcome:** These adjustments occur hundreds of times per second, resulting in a smooth, autonomous wall-following motion.
 
 ---
 
-## 🚀 Hướng dẫn cài đặt
-1.  Tải xuống file `Test02.ino`.
-2.  Mở bằng **Arduino IDE**.
-3.  Kết nối Arduino với máy tính qua cổng USB.
-4.  Chọn đúng Board (Uno/Nano) và Port tương ứng.
-5.  Nhấn **Upload** để nạp code.
-6.  Mở **Serial Monitor** (baudrate 9600) để theo dõi các thông số khoảng cách thực tế từ 3 cảm biến.
+## Code Structure
+- `void setup()`: Initializes I/O pins and Serial communication.
+- `void loop()`: Continuous sensor reading and logic execution.
+- `void right(int a)`, `void left(int a)`...: Basic motion control functions with a delay parameter `a`.
+- `void bamtrai()`: Specific logic for wall-following behavior.
 
 ---
 
-## ⚖️ Tinh chỉnh (Tuning)
-Nếu robot di chuyển không như ý, bạn có thể điều chỉnh các thông số sau:
-- `LeftSpeed` / `RightSpeed`: Tăng giảm để robot đi thẳng hơn (do sai số động cơ).
-- Khoảng cách `7cm` trong các câu lệnh `if`: Tăng lên nếu robot di chuyển với tốc độ cao để tránh va chạm kịp thời.
+## Installation & Setup
+1.  Download the `Test02.ino` file.
+2.  Open it in the Arduino IDE.
+3.  Connect your Arduino board via USB.
+4.  Select the correct Board (Uno/Nano) and Port.
+5.  Click Upload.
+6.  Open the Serial Monitor (9600 baudrate) to monitor real-time sensor data.
 
 ---
-*Dự án được phát triển bởi **Wangtran106**.*
+
+## Tuning
+If the robot does not perform as expected, you can adjust these parameters:
+- `LeftSpeed` / `RightSpeed`: Adjust these to compensate for motor imbalance if the robot doesn't drive straight.
+- **Distance Threshold (7cm):** Increase this if the robot is moving fast and needs more reaction time.
+
+---
+*Developed by Wangtran106.*
+
